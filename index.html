@@ -84,7 +84,9 @@
 
         <div class="px-8 py-4 bg-white border-y flex flex-wrap gap-8 items-center">
             <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Semantic Audit:</span>
-            <div class="flex flex-col"><span class="text-[8px] font-bold text-indigo-500">CLAIM</span><div class="cer-bar"><div id="bar-c" class="cer-fill bg-indigo-500" style="width: 0%"></div></div></div>
+            <div class="flex flex-col"><span class="text-[8px] font-bold text-indigo-500">CLAIM</span><div class=
+                                                                                                          
+                                                                                                          "cer-bar"><div id="bar-c" class="cer-fill bg-indigo-500" style="width: 0%"></div></div></div>
             <div class="flex flex-col"><span class="text-[8px] font-bold text-emerald-500">EVIDENCE</span><div class="cer-bar"><div id="bar-e" class="cer-fill bg-emerald-500" style="width: 0%"></div></div></div>
             <div class="flex flex-col"><span class="text-[8px] font-bold text-amber-500">REASONING</span><div class="cer-bar"><div id="bar-r" class="cer-fill bg-amber-500" style="width: 0%"></div></div></div>
         </div>
@@ -229,37 +231,40 @@
             await this.processDialectic(text);
         },
 
-        async processDialectic(userText) {
-            const loading = document.getElementById('ai-loading');
-            loading.classList.remove('hidden');
-            const startTime = Date.now();
+       async processDialectic(userText) {
+    const loading = document.getElementById('ai-loading');
+    loading.classList.remove('hidden');
+    const startTime = Date.now();
 
-            try {
-                const data = await NeuralService.queryDialectic(userText, this.history);
-                const latency = Date.now() - startTime;
-                document.getElementById('latency-text').innerText = `Latency: ${latency}ms`;
+    try {
+        const data = await NeuralService.queryDialectic(userText, this.history);
+        const latency = Date.now() - startTime;
+        document.getElementById('latency-text').innerText = `Latency: ${latency}ms`;
 
-                let aiResponse = data[0].generated_text.split('[/INST]')[1].trim();
-                
-                // SANITIZATION (Critic No 1)
-                aiResponse = aiResponse.slice(0, 2000); 
+        // PERBAIKAN DI SINI:
+        // Kita langsung mengambil teks dari generated_text tanpa melakukan .split('[/INST]')
+        let aiResponse = data[0].generated_text.replace("[/INST] ", "").trim();
+        
+        // Sanitisasi sederhana
+        aiResponse = aiResponse.slice(0, 2000); 
 
-                if(this.versions.length % 3 === 0) {
-                    aiResponse = "REFLEKSI METAKOGNISI: Saya mengamati pola nalar Anda mulai bertransformasi. Bagaimana versi draf terakhir ini memperbaiki celah logika dari versi sebelumnya? \n\n" + aiResponse;
-                }
+        if(this.versions.length % 3 === 0) {
+            aiResponse = "REFLEKSI METAKOGNISI: Saya mengamati pola nalar Anda mulai bertransformasi. Bagaimana versi draf terakhir ini memperbaiki celah logika dari versi sebelumnya? \n\n" + aiResponse;
+        }
 
-                this.append(aiResponse, 'ai');
-                this.history.push({role: "assistant", content: aiResponse});
-                this.failCount = 0;
-            } catch (err) {
-                this.failCount++;
-                this.handleError();
-            } finally {
-                this.state = "IDLE";
-                loading.classList.add('hidden');
-                this.save();
-            }
-        },
+        this.append(aiResponse, 'ai');
+        this.history.push({role: "assistant", content: aiResponse});
+        this.failCount = 0;
+    } catch (err) {
+        console.error("Detail Error:", err); // Lihat console browser untuk detailnya
+        this.failCount++;
+        this.handleError();
+    } finally {
+        this.state = "IDLE";
+        loading.classList.add('hidden');
+        this.save();
+    }
+}
 
         handleError() {
             const fallback = "Neural Cloud sedang sibuk. Namun, dialektika harus berlanjut secara otonom: Apa bukti terkuat yang bisa Anda ajukan untuk menantang balik posisi Anda sendiri?";
