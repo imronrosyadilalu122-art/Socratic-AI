@@ -118,33 +118,17 @@
     </footer>
 
     <script>
-    /**
-     * SOCRATIC-AI ARCHITECTURAL CORE v69 (10/10 MUTLAK)
-     * Addressing Security, Scalability, and Production Polish
-     */
-    
     const CONFIG = Object.freeze({
-        /**
-         * CRITICAL SECURITY FIX (Critic No 1)
-         * API Token removed from frontend. 
-         * Authentication is handled via secure server-side proxy environment variables.
-         */
-        API_GATEWAY: "/api/socratic-dialectic-proxy", 
         MIN_THRESHOLD: 100,
         MAX_HISTORY: 20,
         COOLDOWN: 4000
     });
 
-    /**
-     * Semantic & Weighted Analysis
-     */
     const CERAnalyzer = {
         analyze(text) {
             const val = text.toLowerCase();
             const numMatches = (text.match(/\d/g) || []).length;
-            const evidenceScore = Math.min(100, (numMatches * 15) + 
-                (/(data|fakta|menurut|pisa|berdasarkan|studi|penelitian)/.test(val) ? 40 : 0));
-            
+            const evidenceScore = Math.min(100, (numMatches * 15) + (/(data|fakta|menurut|pisa|berdasarkan|studi|penelitian)/.test(val) ? 40 : 0));
             return {
                 c: Math.min(100, (text.length / 30 * 100)),
                 e: evidenceScore,
@@ -153,42 +137,30 @@
         }
     };
 
-    /**
-     * Neural Network Abstraction
-     */
     const NeuralService = {
-    async queryDialectic(prompt, history) {
-        // API Key Gemini Anda
-        const GEMINI_API_KEY = "AIzaSyB_28X9HguDGju-XaW87YxwjFRl-0RuMOI"; 
-        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+        async queryDialectic(prompt, history) {
+            const GEMINI_API_KEY = "AIzaSyB_28X9HguDGju-XaW87YxwjFRl-0RuMOI"; 
+            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: `[INSTRUKSI SISTEM: SOCRATIC-AI] 
-                        Anda adalah mesin dialektika untuk SDG 4. 
-                        TUGAS: JANGAN berikan jawaban langsung. Tantang logika pengguna.
-                        Gunakan metode Socrates untuk menguji konsistensi argumen mereka.
-                        
-                        Input Pengguna: ${prompt}`
+            const response = await fetch(API_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: `Anda adalah Socratic-AI. Tugas Anda: JANGAN BERIKAN JAWABAN. Tantang nalar pengguna. Gunakan metode Socrates untuk menguji argumen ini: ${prompt}`
+                        }]
                     }]
-                }]
-            })
-        });
+                })
+            });
 
-        if (!response.ok) throw new Error("Gagal terhubung ke Gemini API");
-
-        const data = await response.json();
-        // Mengambil teks dari respon Gemini
-        const aiText = data.candidates[0].content.parts[0].text;
-        
-        // Mengembalikan format yang dikenali oleh fungsi Engine.processDialectic
-        return [{ generated_text: "[/INST] " + aiText }];
-    }
-};
+            if (!response.ok) throw new Error("API Error");
+            const data = await response.json();
+            
+            // KUNCI PERBAIKAN: Pastikan mengembalikan string langsung
+            return data.candidates[0].content.parts[0].text;
+        }
+    };
 
     const Engine = {
         state: "IDLE",
@@ -200,10 +172,9 @@
         lastRequestTime: 0,
 
         async send() {
-            // COOLDOWN ENFORCEMENT (Critic No 2)
             const now = Date.now();
             if (now - this.lastRequestTime < CONFIG.COOLDOWN) {
-                UI.showHint(`Silakan tunggu ${Math.ceil((CONFIG.COOLDOWN - (now - this.lastRequestTime))/1000)} detik.`);
+                UI.showHint(`Tunggu ${Math.ceil((CONFIG.COOLDOWN - (now - this.lastRequestTime))/1000)} detik.`);
                 return;
             }
 
@@ -212,9 +183,8 @@
             const text = input.value.trim();
             if(!text) return;
 
-            const cer = CERAnalyzer.analyze(text);
             if(this.mode === 'univ' && text.length < CONFIG.MIN_THRESHOLD) {
-                UI.showHint("Kedaulatan kognitif memerlukan narasi yang lebih substantif (>100 karakter).");
+                UI.showHint("Kedaulatan kognitif memerlukan narasi >100 karakter.");
                 return;
             }
 
@@ -222,132 +192,95 @@
             this.lastRequestTime = now;
             this.versions.push(text);
             this.history.push({role: "user", content: text});
-            if(this.history.length > CONFIG.MAX_HISTORY) this.history.shift();
-            this.score += Math.floor(text.length / 10);
-            this.save();
-
+            
             this.append(text, 'user');
             input.value = "";
             await this.processDialectic(text);
         },
 
-       async processDialectic(userText) {
-    const loading = document.getElementById('ai-loading');
-    loading.classList.remove('hidden');
-    const startTime = Date.now();
+        async processDialectic(userText) {
+            const loading = document.getElementById('ai-loading');
+            loading.classList.remove('hidden');
+            const startTime = Date.now();
 
-    try {
-        const data = await NeuralService.queryDialectic(userText, this.history);
-        const latency = Date.now() - startTime;
-        document.getElementById('latency-text').innerText = `Latency: ${latency}ms`;
+            try {
+                // Panggil Service
+                const responseText = await NeuralService.queryDialectic(userText, this.history);
+                
+                const latency = Date.now() - startTime;
+                document.getElementById('latency-text').innerText = `Latency: ${latency}ms`;
 
-        // PERBAIKAN DI SINI:
-        // Kita langsung mengambil teks dari generated_text tanpa melakukan .split('[/INST]')
-        let aiResponse = data[0].generated_text.replace("[/INST] ", "").trim();
-        
-        // Sanitisasi sederhana
-        aiResponse = aiResponse.slice(0, 2000); 
+                let aiResponse = responseText.trim();
 
-        if(this.versions.length % 3 === 0) {
-            aiResponse = "REFLEKSI METAKOGNISI: Saya mengamati pola nalar Anda mulai bertransformasi. Bagaimana versi draf terakhir ini memperbaiki celah logika dari versi sebelumnya? \n\n" + aiResponse;
-        }
+                if(this.versions.length % 3 === 0) {
+                    aiResponse = "REFLEKSI METAKOGNISI: Saya mengamati pola nalar Anda mulai bertransformasi. \n\n" + aiResponse;
+                }
 
-        this.append(aiResponse, 'ai');
-        this.history.push({role: "assistant", content: aiResponse});
-        this.failCount = 0;
-    } catch (err) {
-        console.error("Detail Error:", err); // Lihat console browser untuk detailnya
-        this.failCount++;
-        this.handleError();
-    } finally {
-        this.state = "IDLE";
-        loading.classList.add('hidden');
-        this.save();
-    }
-}
+                this.append(aiResponse, 'ai');
+                this.history.push({role: "assistant", content: aiResponse});
+                this.failCount = 0;
+            } catch (err) {
+                console.error(err);
+                this.failCount++;
+                this.handleError();
+            } finally {
+                this.state = "IDLE";
+                loading.classList.add('hidden');
+                this.save();
+            }
+        },
 
         handleError() {
-            const fallback = "Neural Cloud sedang sibuk. Namun, dialektika harus berlanjut secara otonom: Apa bukti terkuat yang bisa Anda ajukan untuk menantang balik posisi Anda sendiri?";
-            this.append(this.failCount >= 2 ? fallback : "Hambatan jaringan terdeteksi. Silakan ulangi argumen Anda.", "ai");
+            this.append(this.failCount >= 2 ? "Neural Cloud sibuk. Apa bukti terkuat untuk menantang posisi Anda sendiri?" : "Hambatan jaringan. Coba kirim ulang argumen Anda.", "ai");
         },
 
         append(text, sender) {
             const box = document.getElementById('chat-box');
             const div = document.createElement('div');
             div.className = `bubble ${sender} shadow-sm`;
-            // SECURE TEXT CONTENT
             div.textContent = text; 
             box.appendChild(div);
             box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
-            if(sender === 'ai') UI.speak(text);
         },
 
         save() {
             localStorage.setItem('sc_score', this.score);
             localStorage.setItem('sc_history', JSON.stringify(this.history));
             UI.updateStats();
-        },
-
-        setMode(m) {
-            this.mode = m;
-            UI.showHint(`Mode: ${m.toUpperCase()}. Fokus kognitif disesuaikan.`);
-        },
-
-        exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.history));
-            const dlAnchor = document.createElement('a');
-            dlAnchor.setAttribute("href", dataStr);
-            dlAnchor.setAttribute("download", `Research_Data_${new Date().getTime()}.json`);
-            document.body.appendChild(dlAnchor);
-            dlAnchor.click();
-            dlAnchor.remove();
         }
     };
 
     const UI = {
-        isA11y: false,
         updateStats() {
             document.getElementById('stat-score').innerText = Engine.score;
             document.getElementById('stat-rev').innerText = Engine.versions.length;
             const cer = CERAnalyzer.analyze(Engine.versions[Engine.versions.length-1] || "");
             const avg = (cer.c + cer.e + cer.r) / 3;
             document.getElementById('stat-cer').innerText = `${avg.toFixed(0)}%`;
-            let level = "EMERGING";
-            if(avg > 40) level = "ANALYTICAL";
-            if(avg > 80) level = "DIALEKTICAL";
-            document.getElementById('stat-level').innerText = level;
         },
-        toggleTeacher() { document.getElementById('teacher-panel').classList.toggle('hidden'); this.updateStats(); },
-        toggleA11y() { this.isA11y = !this.isA11y; document.body.style.fontSize = this.isA11y ? "20px" : "16px"; },
-        speak(text) { if(this.isA11y && window.speechSynthesis) speechSynthesis.speak(new SpeechSynthesisUtterance(text)); },
+        toggleTeacher() { document.getElementById('teacher-panel').classList.toggle('hidden'); },
         showHint(msg) { 
             const h = document.getElementById('hint-msg');
             h.innerText = msg;
-            h.classList.replace('text-slate-400', 'text-indigo-600');
-            setTimeout(() => h.classList.replace('text-indigo-600', 'text-slate-400'), 4000);
+            setTimeout(() => h.innerText = "Gate Status: Locked", 4000);
         }
     };
 
     const input = document.getElementById('user-input');
     input.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = this.scrollHeight + 'px';
         const cer = CERAnalyzer.analyze(this.value);
         document.getElementById('bar-c').style.width = cer.c + '%';
         document.getElementById('bar-e').style.width = cer.e + '%';
         document.getElementById('bar-r').style.width = cer.r + '%';
         const len = this.value.length;
         document.getElementById('char-count').innerText = `${len} / ${CONFIG.MIN_THRESHOLD}`;
-        document.getElementById('send-btn').disabled = len < 40;
         const hint = document.getElementById('hint-msg');
         hint.innerText = len >= CONFIG.MIN_THRESHOLD ? "Gate Status: Unlocked (Audit Ready)" : "Gate Status: Locked (Insufficient Nalar)";
-        hint.classList.toggle('text-indigo-600', len >= CONFIG.MIN_THRESHOLD);
-        hint.classList.toggle('text-slate-400', len < CONFIG.MIN_THRESHOLD);
     });
 
     input.addEventListener('keydown', e => {
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Engine.send(); }
     });
-    </script>
+</script>
 </body>
 </html>
