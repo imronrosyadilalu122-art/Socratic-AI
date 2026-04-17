@@ -121,132 +121,85 @@
     const CONFIG = Object.freeze({
         MIN_THRESHOLD: 100,
         MAX_HISTORY: 20,
-        COOLDOWN: 4000
+        COOLDOWN: 2000 // Dipercepat untuk simulasi demo
     });
 
     const CERAnalyzer = {
         analyze(text) {
             const val = text.toLowerCase();
             const numMatches = (text.match(/\d/g) || []).length;
-            const evidenceScore = Math.min(100, (numMatches * 15) + (/(data|fakta|menurut|pisa|berdasarkan|studi|penelitian)/.test(val) ? 40 : 0));
+            const hasEvidence = /(data|fakta|menurut|pisa|berdasarkan|studi|penelitian)/.test(val);
+            const hasReasoning = /(karena|sehingga|akibatnya|maka|oleh karena|logikanya|artinya)/.test(val);
+            
             return {
                 c: Math.min(100, (text.length / 30 * 100)),
-                e: evidenceScore,
-                r: /(karena|sehingga|akibatnya|maka|oleh karena|logikanya|artinya)/.test(val) ? 100 : 0
+                e: Math.min(100, (numMatches * 15) + (hasEvidence ? 40 : 0)),
+                r: hasReasoning ? 100 : 0
             };
         }
     };
 
+    // SERVICE DIUBAH MENJADI SIMULASI (TANPA API)
     const NeuralService = {
-        async queryDialectic(prompt, history) {
-            const GEMINI_API_KEY = "AIzaSyB_28X9HguDGju-XaW87YxwjFRl-0RuMOI"; 
-            const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-            const response = await fetch(API_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: `Anda adalah Socratic-AI. Tugas Anda: JANGAN BERIKAN JAWABAN. Tantang nalar pengguna. Gunakan metode Socrates untuk menguji argumen ini: ${prompt}`
-                        }]
-                    }]
-                })
+        async queryDialectic(prompt) {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    if (prompt.length < CONFIG.MIN_THRESHOLD) {
+                        resolve("🔒 GATE STATUS: LOCKED\n\nNarasi Anda terlalu singkat. Kedaulatan kognitif memerlukan bukti substantif. Gunakan kerangka CER (Claim, Evidence, Reasoning) dengan minimal 100 karakter untuk membuka audit.");
+                    } else {
+                        resolve("🔓 GATE STATUS: UNLOCKED (CER Score: 85%)\n\nNeural Dialectic Framework Aktif. Argumen Anda tentang data kecemasan cukup kuat. Namun, mari kita uji konsistensinya: Jika media sosial adalah penyebab tunggal depresi, mengapa banyak remaja di komunitas kreatif justru menemukan dukungan kesehatan mental dan koneksi melalui platform yang sama? Apakah masalahnya ada pada 'algoritma' atau pada 'kapasitas literasi' penggunanya?");
+                    }
+                }, 1500); // Simulasi delay berpikir
             });
-
-            if (!response.ok) throw new Error("API Error");
-            const data = await response.json();
-            
-            // KUNCI PERBAIKAN: Pastikan mengembalikan string langsung
-            return data.candidates[0].content.parts[0].text;
         }
     };
 
     const Engine = {
         state: "IDLE",
         mode: 'univ',
-        score: parseInt(localStorage.getItem('sc_score')) || 0,
+        score: 0,
         versions: [],
-        history: JSON.parse(localStorage.getItem('sc_history')) || [],
-        failCount: 0,
+        history: [],
         lastRequestTime: 0,
 
         async send() {
             const now = Date.now();
-            if (now - this.lastRequestTime < CONFIG.COOLDOWN) {
-                UI.showHint(`Tunggu ${Math.ceil((CONFIG.COOLDOWN - (now - this.lastRequestTime))/1000)} detik.`);
-                return;
-            }
+            if (now - this.lastRequestTime < CONFIG.COOLDOWN) return;
 
-            if(this.state !== "IDLE") return;
             const input = document.getElementById('user-input');
             const text = input.value.trim();
-            if(!text) return;
-
-            if(this.mode === 'univ' && text.length < CONFIG.MIN_THRESHOLD) {
-                UI.showHint("Kedaulatan kognitif memerlukan narasi >100 karakter.");
-                return;
-            }
+            if(!text || this.state !== "IDLE") return;
 
             this.state = "PROCESSING";
             this.lastRequestTime = now;
-            this.versions.push(text);
-            this.history.push({role: "user", content: text});
-            
             this.append(text, 'user');
             input.value = "";
-            await this.processDialectic(text);
-        },
-
-        async processDialectic(userText) {
+            
             const loading = document.getElementById('ai-loading');
             loading.classList.remove('hidden');
-            const startTime = Date.now();
 
             try {
-                // Panggil Service
-                const responseText = await NeuralService.queryDialectic(userText, this.history);
-                
-                const latency = Date.now() - startTime;
-                document.getElementById('latency-text').innerText = `Latency: ${latency}ms`;
-
-                let aiResponse = responseText.trim();
-
-                if(this.versions.length % 3 === 0) {
-                    aiResponse = "REFLEKSI METAKOGNISI: Saya mengamati pola nalar Anda mulai bertransformasi. \n\n" + aiResponse;
-                }
-
-                this.append(aiResponse, 'ai');
-                this.history.push({role: "assistant", content: aiResponse});
-                this.failCount = 0;
+                const responseText = await NeuralService.queryDialectic(text);
+                this.append(responseText, 'ai');
+                this.versions.push(text);
+                this.score += (text.length >= CONFIG.MIN_THRESHOLD ? 10 : 0);
+                UI.updateStats();
             } catch (err) {
                 console.error(err);
-                this.failCount++;
-                this.handleError();
             } finally {
                 this.state = "IDLE";
                 loading.classList.add('hidden');
-                this.save();
             }
-        },
-
-        handleError() {
-            this.append(this.failCount >= 2 ? "Neural Cloud sibuk. Apa bukti terkuat untuk menantang posisi Anda sendiri?" : "Hambatan jaringan. Coba kirim ulang argumen Anda.", "ai");
         },
 
         append(text, sender) {
             const box = document.getElementById('chat-box');
             const div = document.createElement('div');
             div.className = `bubble ${sender} shadow-sm`;
+            div.style.whiteSpace = "pre-line"; 
             div.textContent = text; 
             box.appendChild(div);
             box.scrollTo({ top: box.scrollHeight, behavior: 'smooth' });
-        },
-
-        save() {
-            localStorage.setItem('sc_score', this.score);
-            localStorage.setItem('sc_history', JSON.stringify(this.history));
-            UI.updateStats();
         }
     };
 
@@ -254,31 +207,37 @@
         updateStats() {
             document.getElementById('stat-score').innerText = Engine.score;
             document.getElementById('stat-rev').innerText = Engine.versions.length;
-            const cer = CERAnalyzer.analyze(Engine.versions[Engine.versions.length-1] || "");
+            const lastText = Engine.versions[Engine.versions.length-1] || "";
+            const cer = CERAnalyzer.analyze(lastText);
             const avg = (cer.c + cer.e + cer.r) / 3;
             document.getElementById('stat-cer').innerText = `${avg.toFixed(0)}%`;
+            if(avg > 70) document.getElementById('stat-level').innerText = "ADVANCED";
         },
         toggleTeacher() { document.getElementById('teacher-panel').classList.toggle('hidden'); },
-        showHint(msg) { 
-            const h = document.getElementById('hint-msg');
-            h.innerText = msg;
-            setTimeout(() => h.innerText = "Gate Status: Locked", 4000);
-        }
+        toggleA11y() { alert("Aksesibilitas diaktifkan."); }
     };
 
-    const input = document.getElementById('user-input');
-    input.addEventListener('input', function() {
+    const inputElement = document.getElementById('user-input');
+    inputElement.addEventListener('input', function() {
         const cer = CERAnalyzer.analyze(this.value);
         document.getElementById('bar-c').style.width = cer.c + '%';
         document.getElementById('bar-e').style.width = cer.e + '%';
         document.getElementById('bar-r').style.width = cer.r + '%';
+        
         const len = this.value.length;
         document.getElementById('char-count').innerText = `${len} / ${CONFIG.MIN_THRESHOLD}`;
+        
         const hint = document.getElementById('hint-msg');
-        hint.innerText = len >= CONFIG.MIN_THRESHOLD ? "Gate Status: Unlocked (Audit Ready)" : "Gate Status: Locked (Insufficient Nalar)";
+        if(len >= CONFIG.MIN_THRESHOLD) {
+            hint.innerText = "Gate Status: Unlocked (Audit Ready)";
+            hint.classList.replace('text-slate-400', 'text-emerald-500');
+        } else {
+            hint.innerText = "Gate Status: Locked (Insufficient Nalar)";
+            hint.classList.replace('text-emerald-500', 'text-slate-400');
+        }
     });
 
-    input.addEventListener('keydown', e => {
+    inputElement.addEventListener('keydown', e => {
         if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); Engine.send(); }
     });
 </script>
